@@ -570,7 +570,7 @@ void Anagram(vector<DictStruct> dict, vector<DictStruct> anagram)
 		anagrammeInputConcat = anagrammeInputConcat + anagram[i].mot;
 	}
 	DictStruct anagrammeStruct = computeString(anagrammeInputConcat);
-	int index = (findPos(anagrammeStruct, dict)-1);
+	int index = (findPos(anagrammeStruct, dict));
 	if(dict[index].sortedStringOnChar == anagrammeStruct.sortedStringOnChar)
 	{
 		if(dict[index].IsComposed)
@@ -633,3 +633,31 @@ int main()
 	}
 	return 0;
 }
+
+/*
+A B C DEF .
+A
+B
+C
+DEF
+A B CD .
+
+There is no anagram for this message and this dictionary
+A B .
+
+
+A B
+B A
+DEFA .
+
+There is no anagram for this message and this dictionary
+ADEF .
+
+
+A DEF
+DEF A
+*
+a logic error make it unable to work if the anagram is not in the right order...
+check the sort function and check that the alpha is checked correctly
+ *
+ * /
