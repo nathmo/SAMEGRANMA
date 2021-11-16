@@ -33,6 +33,7 @@ int lecture(vector<DictStruct> &listOfDictStruct);
  * Sortie : rien, affiche le dictionnaire
 */
 void displayDict(vector<DictStruct> &dictionnary);
+void displayDebug(vector<DictStruct> &dictionnary);
 
 /*
  * test que la string respectent les conditions demandé
@@ -211,6 +212,18 @@ void displayDict(vector<DictStruct> &dictionnary)
 	}
 }
 
+void displayDebug(vector<DictStruct> &dictionnary)
+{
+	for(unsigned int i = 0; i < dictionnary.size(); ++i)
+	{
+		cout <<"mot " << dictionnary[i].mot << endl;
+		cout <<"sorted " << dictionnary[i].sortedStringOnChar << endl;
+		cout <<"nbT " << dictionnary[i].nbT << endl;
+		cout <<"nbD " << dictionnary[i].nbD << endl;
+		cout << "---------" << endl;
+	}
+}
+
 int test(DictStruct structStringEntree, int &index,
 			vector<DictStruct> &listOfDictStruct)
 {
@@ -311,10 +324,6 @@ int findPos(DictStruct structStringEntree, vector<DictStruct> &listOfDictStruct)
 		{
 			wordDontMatch = false;
 		}
-	}
-	if(listOfDictStruct.size() <= positionInIndex)
-	{
-		return (positionInIndex-1); // prevent segfault
 	}
 	return positionInIndex;
 }
@@ -562,6 +571,24 @@ vector<vector<string>> permutation(vector<string> listOfString)
 	return permut;
 }
 
+vector<int> findAm(DictStruct structStringEntree, vector<DictStruct> &listOfDictStruct)
+{
+	vector<int> positionInIndex = {};
+	for(unsigned int i = 0; i<listOfDictStruct.size();++i)
+	{
+		unsigned int nbT = listOfDictStruct[i].nbT;
+		string alpha = listOfDictStruct[i].sortedStringOnChar;
+		if(structStringEntree.nbT == nbT)
+		{
+			if(structStringEntree.sortedStringOnChar == alpha)
+			{
+				positionInIndex.push_back(i);
+			}
+		}
+	}
+	return positionInIndex;
+}
+
 void Anagram(vector<DictStruct> dict, vector<DictStruct> anagram)
 {
 	string anagrammeInputConcat;
@@ -570,29 +597,36 @@ void Anagram(vector<DictStruct> dict, vector<DictStruct> anagram)
 		anagrammeInputConcat = anagrammeInputConcat + anagram[i].mot;
 	}
 	DictStruct anagrammeStruct = computeString(anagrammeInputConcat);
-	int index = (findPos(anagrammeStruct, dict));
-	if(dict[index].sortedStringOnChar == anagrammeStruct.sortedStringOnChar)
+	vector<DictStruct> debugPLZDeleteMe = {anagrammeStruct};
+	//displayDebug(debugPLZDeleteMe);
+	//cout << anagrammeStruct.sortedStringOnChar << endl;
+	//cout << anagrammeStruct.mot << endl;
+	vector<int> index = (findAm(anagrammeStruct, dict));
+	for(auto anaIndex : index)
 	{
-		if(dict[index].IsComposed)
+		if(dict[anaIndex].sortedStringOnChar == anagrammeStruct.sortedStringOnChar)
 		{
-			cout << endl;
-			vector<vector<string>> permutToSort = permutation(dict[index].subwords);
-			vector<DictStruct> permuta;
-			for(unsigned int j = 0; j<permutToSort.size(); ++j)
+			if(dict[anaIndex].IsComposed)
 			{
-				permuta.push_back(computeString(permutToSort[j]));
+				cout << endl;
+				vector<vector<string>> permutToSort = permutation(dict[anaIndex].subwords);
+				vector<DictStruct> permuta;
+				for(unsigned int j = 0; j<permutToSort.size(); ++j)
+				{
+					permuta.push_back(computeString(permutToSort[j]));
+				}
+				permuta = sort(permuta);
+				displayAnagram(permuta);
 			}
-			permuta = sort(permuta);
-			displayAnagram(permuta);
-		}
-		else
-		{
-			cout << endl;
-			vector<DictStruct> permuta = {computeString(dict[index].mot)};
-			displayAnagram(permuta);
+			else
+			{
+				cout << endl;
+				vector<DictStruct> permuta = {computeString(dict[anaIndex].mot)};
+				displayAnagram(permuta);
+			}
 		}
 	}
-	else
+	if(index.size() == 0)
 	{
 		cout << NO_ANAGRAM << endl;
 	}
@@ -611,6 +645,7 @@ int main()
 		}
 		displayDict(dictionnary);
 		computeMultiverseFromDict(dictionnary);
+		//displayDebug(dictionnary);
 		int status = 0;
 		while(status !=4)
 		{
@@ -657,7 +692,7 @@ ADEF .
 A DEF
 DEF A
 *
-a logic error make it unable to work if the anagram is not in the right order...
+a logic error make it unable to work if the anagram is its sorted version
 check the sort function and check that the alpha is checked correctly
  *
- * /
+ */
