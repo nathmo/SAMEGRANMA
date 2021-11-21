@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <math.h>
+#include <time.h>
 using namespace std;
 
 const string NOT_IN_CAPITAL_LETTERS("The word is not purely in capital letters");
@@ -10,11 +11,11 @@ const string EMPTY_DICO("The dictionnary cannot be empty");
 const string NO_ANAGRAM("There is no anagram for this message and this dictionary");
 
 struct DictStruct {
-	string mot;
-	string sortedStringOnChar;
 	unsigned int nbT;
 	unsigned int nbD;
 	bool IsComposed = false;
+	string mot;
+	string sortedStringOnChar;
 	vector<string> subwords;
 };
 
@@ -24,7 +25,7 @@ struct DictStruct {
  * Entree : Adresse tableau struct
  * Sortie : code de status (affiche d'éventuelle code d'erreur)
 */
-int lecture(vector<DictStruct> &listOfDictStruct);
+int lecture(vector<DictStruct> &listOfDictStruct, bool exitIfError);
 
 /*
  * affiche le dictionnaire
@@ -152,16 +153,16 @@ void Anagram(vector<DictStruct> dict, vector<DictStruct> anagram);
  * Sortie : rien (affiche les resultats)
  * 
 */
-void displayAnagram(vector<DictStruct> &listOfString);
+void displayAnagram(vector<string> &listOfString);
 
 /*
  * compute les permutations des elements d'une liste
  * 
  * Entrée : liste
- * Sortie : liste de permutation(list)
+ * Sortie : liste de permutation(list) (par référence)
  * 
 */
-vector<vector<string>> permutation(vector<string> listOfString);
+void permutation(vector<string> &listOfString, vector<vector<string>> &permut, int z=0);
 
 /*
  * compute les combinaisons des elements d'une liste
@@ -172,11 +173,14 @@ vector<vector<string>> permutation(vector<string> listOfString);
 */
 vector<vector<string>> combination(vector<string> listOfString);
 
-int lecture(vector<DictStruct> &listOfDictStruct)
+int factorial(int n);
+
+int lecture(vector<DictStruct> &listOfDictStruct, bool exitIfError)
 {
 	string entree;
 	cin >> entree;
 	int status = 0;
+	bool firstNotInCapital = true;
 	while(entree != "." and entree != "*")
 	{
 		int index = 0;
@@ -188,14 +192,27 @@ int lecture(vector<DictStruct> &listOfDictStruct)
 		}
 		else if(status == 1)
 		{
-			cout << NOT_IN_CAPITAL_LETTERS << endl;
-			return 1;
+			if(firstNotInCapital and not exitIfError)
+			{
+				cout << endl;
+				firstNotInCapital = false;
+			}
+			cout << NOT_IN_CAPITAL_LETTERS<< endl;
+			if(exitIfError)
+			{
+				exit(0); // quit if not fully in caps and reading dict
+			}
+		}
+		else if((status == 2) and exitIfError)
+		{
+			cout << DOUBLE_WORD << endl;
+			exit(0); // quit if aldready in dict (dont apply for anagra)
 		}
 		cin >> entree;
 	}
 	if(entree == "*")
 	{
-		return 4;
+		exit(0);
 	}
 	if(entree == ".")
 	{
@@ -357,24 +374,27 @@ void insert(int index, DictStruct structToInsert
 				, vector<DictStruct> &listOfDictStruct)
 {
 	vector<DictStruct> tempListOfDictStruct;
+	DictStruct tempA = structToInsert;
 	unsigned int idx(index);
 	// attention <= car taille apres ajout = taille + 1
-	for(unsigned int i = 0; i<=listOfDictStruct.size(); ++i)
+	if(idx < listOfDictStruct.size())
 	{
-		if(i < idx)
+		for(unsigned int i = idx; i<(listOfDictStruct.size()); ++i)
 		{
-			tempListOfDictStruct.push_back(listOfDictStruct[i]);
-		}
-		else if(i == idx)
-		{
-			tempListOfDictStruct.push_back(structToInsert);
-		}
-		else if(i > idx)
-		{
-			tempListOfDictStruct.push_back(listOfDictStruct[i-1]);
+			if(i == idx)
+			{
+				tempA = listOfDictStruct[i];
+				listOfDictStruct[i] = structToInsert;
+			}
+			else
+			{
+				DictStruct tempB = listOfDictStruct[i];
+				listOfDictStruct[i] = tempA;
+				tempA = tempB;
+			}
 		}
 	}
-	listOfDictStruct = tempListOfDictStruct;
+	listOfDictStruct.push_back(tempA);
 	return;
 }
 
@@ -403,12 +423,18 @@ void insert(int index, string stringToInsert
 
 vector<DictStruct> sort(vector<DictStruct> &list)
 {
+	// UTILISER TRI DOCHOTOMIQUE
+	clock_t tStart = clock();
+	cout << "Time01 taken: "<< (double)(clock() - tStart)/CLOCKS_PER_SEC<< endl;
 	vector<DictStruct> sortedList;
 	for(unsigned int elemIndex = 0; elemIndex < list.size(); ++elemIndex)
 	{
-		unsigned int newIndex = findPos(list[elemIndex], sortedList);
-		insert(newIndex, list[elemIndex], sortedList);
+		cout << "Time00 taken: "<< (double)(clock() - tStart)/CLOCKS_PER_SEC<< endl;
+		unsigned int newIndex = findPos(list[elemIndex], sortedList); // 1.2 ms
+		cout << "Time01 taken: "<< (double)(clock() - tStart)/CLOCKS_PER_SEC<< endl;
+		insert(newIndex, list[elemIndex], sortedList); // 9.3 ms
 	}
+	cout << "Time02 taken: "<< (double)(clock() - tStart)/CLOCKS_PER_SEC<< endl;
 	return sortedList;
 }
 
@@ -527,48 +553,74 @@ vector<vector<string>> combination(vector<string> listOfString)
 	return output;
 }
 
-void displayAnagram(vector<DictStruct> &listOfString)
+void displayAnagram(vector<vector<string>> &listOfString)
 {
 	for(unsigned int j = 0; j<listOfString.size(); ++j)
 	{
-		for(unsigned int i = 0; i<(listOfString[j].subwords.size()-1); ++i)
+		string stringToOut;
+		for(unsigned int i = 0; i<(listOfString[j].size()-1); ++i)
 		{
-			cout << listOfString[j].subwords[i] << " ";
+			stringToOut = stringToOut + listOfString[j][(listOfString[j].size()-1)-i] + " ";
 		}
-		cout << listOfString[j].subwords[listOfString[j].subwords.size()-1] << endl;
+		stringToOut = stringToOut + listOfString[j][0] + '\n';
+		cout << stringToOut;
 	}
 }
 
-vector<vector<string>> permutation(vector<string> listOfString)
+int factorial(int n) {
+	if (n<=1)
+	{
+		return 1;
+	}
+	else if(n<10)
+	{
+		switch(n)
+		{
+			case 2  :
+				return 2;
+			case 3  :
+				return 6;
+			case 4  :
+				return 24;
+			case 5  :
+				return 120;
+			case 6  :
+				return 720;
+			case 7  :
+				return 5040;
+			case 8  :
+				return 40320;
+			case 9  :
+				return 362880;
+		}
+	}
+	return factorial(n-1)*n;
+}
+
+void permutation(vector<string> &listOfString, vector<vector<string>> &permut, int z)
 {
-	vector<vector<string>> permut;
 	if(listOfString.size() == 2)
 	{
-		return {{listOfString[0],listOfString[1]},{listOfString[1],listOfString[0]}};
+		permut.push_back({listOfString[1],listOfString[0]});
+		permut.push_back({listOfString[0],listOfString[1]});
 	}
-	for(unsigned int i = 0; i<listOfString.size(); ++i)
+	else if(listOfString.size() > 2)
 	{
-		vector<string> sublist ;
-		for(unsigned int j = 0; j<(listOfString.size()-1); ++j)
-		{// reconstruit la liste en enlevant le ieme element
-			if(j < i)
-			{
-				sublist.push_back(listOfString[j]);
-			}
-			else
-			{
-				sublist.push_back(listOfString[j+1]);
-			}
-		}
-		vector<vector<string>> subPermutation = permutation(sublist);
-		for(unsigned int j = 0; j<subPermutation.size(); ++j)
+		for(unsigned int i = 0; i<listOfString.size(); ++i)
 		{
-			vector<string> setOfWord = subPermutation[j];// pour chaque sub permutation
-			setOfWord.push_back(listOfString[i]);// ajouter le mot enlevé
-			permut.push_back(setOfWord);// reconstruire la liste de permutation
+			vector<string> sublist = listOfString;
+			for(unsigned int j = i; j<(listOfString.size()-1); ++j)
+			{// reconstruit la liste en enlevant le ieme element
+				sublist[j]=listOfString[j+1];
+			}
+			sublist.pop_back();
+			permutation(sublist, permut, z+i*factorial(sublist.size()));
+			for(unsigned int j = 0; j<unsigned(factorial(sublist.size())); ++j)
+			{
+				permut[j+i*factorial(sublist.size())+z].push_back(listOfString[i]);
+			}
 		}
 	}
-	return permut;
 }
 
 vector<int> findAm(DictStruct structStringEntree, vector<DictStruct> &listOfDictStruct)
@@ -598,101 +650,62 @@ void Anagram(vector<DictStruct> dict, vector<DictStruct> anagram)
 	}
 	DictStruct anagrammeStruct = computeString(anagrammeInputConcat);
 	vector<DictStruct> debugPLZDeleteMe = {anagrammeStruct};
-	//displayDebug(debugPLZDeleteMe);
-	//cout << anagrammeStruct.sortedStringOnChar << endl;
-	//cout << anagrammeStruct.mot << endl;
 	vector<int> index = (findAm(anagrammeStruct, dict));
+	cout << endl;
 	for(auto anaIndex : index)
 	{
 		if(dict[anaIndex].sortedStringOnChar == anagrammeStruct.sortedStringOnChar)
 		{
 			if(dict[anaIndex].IsComposed)
 			{
-				cout << endl;
-				vector<vector<string>> permutToSort = permutation(dict[anaIndex].subwords);
-				vector<DictStruct> permuta;
-				for(unsigned int j = 0; j<permutToSort.size(); ++j)
-				{
-					permuta.push_back(computeString(permutToSort[j]));
-				}
-				permuta = sort(permuta);
+				vector<vector<string>> permuta;
+				permuta.reserve(factorial(dict[anaIndex].subwords.size()));
+				vector<string> wordSetComposingAnagram = sort(dict[anaIndex].subwords);
+				permutation(wordSetComposingAnagram, permuta);
 				displayAnagram(permuta);
 			}
 			else
 			{
-				cout << endl;
-				vector<DictStruct> permuta = {computeString(dict[anaIndex].mot)};
+				vector<vector<string>> permuta = {{dict[anaIndex].mot}};
 				displayAnagram(permuta);
 			}
 		}
 	}
 	if(index.size() == 0)
 	{
-		cout << NO_ANAGRAM << endl;
+		cout << NO_ANAGRAM<< endl;
 	}
 }
 
 int main()
 {
+	ios_base::sync_with_stdio(false);
+	//clock_t tStart = clock();
 	vector<DictStruct> dictionnary;
-	int status = lecture(dictionnary);
+	int status = lecture(dictionnary, true);
 	if(status==3)
 	{
 		if(dictionnary.size() == 0)
 		{
-			cout <<EMPTY_DICO << endl;
+			cout << EMPTY_DICO << endl;
 			return 0;
 		}
 		displayDict(dictionnary);
 		computeMultiverseFromDict(dictionnary);
-		//displayDebug(dictionnary);
 		int status = 0;
 		while(status !=4)
 		{
 			vector<DictStruct> anagramme;
-			status = lecture(anagramme);
-			cout << endl;
+			status = lecture(anagramme, false);
 			if(status == 3)
 			{
 				if(anagramme.size() != 0)
 				{
 					Anagram(dictionnary, anagramme);
+					//cout << "Total Time taken: "<< (double)(clock() - tStart)/CLOCKS_PER_SEC<< endl;
 				}
 			}
 		}
 	}
-	else if(status == 2)
-	{
-		cout << DOUBLE_WORD << endl;
-		return 2;
-	}
 	return 0;
 }
-
-/*
-A B C DEF .
-A
-B
-C
-DEF
-A B CD .
-
-There is no anagram for this message and this dictionary
-A B .
-
-
-A B
-B A
-DEFA .
-
-There is no anagram for this message and this dictionary
-ADEF .
-
-
-A DEF
-DEF A
-*
-a logic error make it unable to work if the anagram is its sorted version
-check the sort function and check that the alpha is checked correctly
- *
- */
