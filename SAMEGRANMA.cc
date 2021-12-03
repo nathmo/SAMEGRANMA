@@ -14,6 +14,14 @@
 
 using namespace std;
 
+#define GREATER 1
+#define LOWER -1
+#define EQUAL 0
+#define ENDOFENTRY 3
+#define CAPITALIZATIONERROR 1
+#define REDUNDANTERROR 2
+#define OK 0
+
 struct DictStruct {
     unsigned int nbT; // nombre de lettre dans mot (accèlere la recherche)
     unsigned int nbD; // nombre de lettre unique dans le mots (accèlere la recherche)
@@ -28,7 +36,7 @@ const string DOUBLE_WORD("Each word can be present only once");
 const string EMPTY_DICO("The dictionnary cannot be empty");
 const string NO_ANAGRAM("There is no anagram for this message and this dictionary");
 
-int lecture(vector<DictStruct> &listOfDictStruct, bool exitIfError);
+int lecture(vector<DictStruct> &dictionnary, bool exitIfError);
 void manageException(int code, bool exitIfError, bool &firstNotInCapital);
 void displayDict(vector<DictStruct> &dictionnary);
 void displayDebug(vector<DictStruct> &dictionnary);
@@ -38,14 +46,14 @@ void displayDebug(vector<DictStruct> &dictionnary);
  *
  * Entree : Adresse tableau struct
  * Sortie : code d'erreur
- * 0 = l'entrée respecte les conditions
- * 1 = not fully in capital
- * 2 = the word is aldready in the dictionnary
+ * OK = l'entrée respecte les conditions
+ * CAPITALIZATIONERROR = not fully in capital
+ * REDUNDANTERROR = the word is aldready in the dictionnary
 */
-int test(DictStruct structStringEntree,int index,vector<DictStruct> &listOfDictStruct);
-bool isCaps(string stringEntree);
-bool inDict(DictStruct structStringEntree,int index,
-            vector<DictStruct> &listOfDictStruct);
+int test(DictStruct structStringToTest,int index,vector<DictStruct> &dictionnary);
+bool isCaps(string structStringToTest);
+bool inDict(DictStruct structStringToTest,int index,
+            vector<DictStruct> &dictionnary);
 /*
  * trouve la position ou se trouve vs devrait se trouver une string
  * dans le dictionnaire / liste de string et retourne son index
@@ -57,10 +65,10 @@ bool inDict(DictStruct structStringEntree,int index,
  * Sortie : int de l'index
  *
 */
-int findPos(DictStruct structStringEntree, vector<DictStruct> &listOfDictStruct);
+int findPos(DictStruct structStringToTest, vector<DictStruct> &dictionnary);
 int findPosAlphabet(string stringEntree, vector<string> &listOfString);
 
-void insert(int index, DictStruct structToInsert,vector<DictStruct> &listOfDictStruct);
+void insert(int index, DictStruct structToInsert,vector<DictStruct> &dictionnary);
 void insert(int index, string stringToInsert, vector<string> &listOfString);
 vector<string> sortnbTAlpha(vector<string> list);
 vector<string> sort(vector<string> list);
@@ -73,7 +81,6 @@ string sort(string list);
  *
 */
 DictStruct computeString(string word);
-DictStruct computeString(vector <string> multiword);
 DictStruct computeStringFast(vector <string> multiword);
 int computeNbD(string sortedCharWord);
 /*
@@ -81,7 +88,7 @@ int computeNbD(string sortedCharWord);
  * and update the anaSpace with the permutation
  * so we have a nice and fast lookup table of every possible anagram
  *
- * Entrée : listOfStruct
+ * Entrée : listOfStruct (must be sorted on char (alpha))
  * Sortie : rien (update via référence)
  *
 */
@@ -90,10 +97,11 @@ void computeMultiverseFromDict(vector<DictStruct> &dico,
 vector<vector<string>> combination(vector<string> listOfString, unsigned int size);
 void displayAnagram(vector<string> &listOfString);
 int factorial(int n);
-void permutation(vector<string> &listOfString, vector<vector<string>> &permut,int z=0);
+void permutation(vector<string> &listOfString,
+                 vector<vector<string>> &permutList,int z=0);
 int compare(DictStruct structA, DictStruct structB);
 int compareFast(DictStruct structA, DictStruct structB);
-vector<int> findAm(DictStruct structStringEntree,vector<DictStruct> &listOfDictStruct);
+vector<int> findAm(DictStruct anagram,vector<DictStruct> &dictionnary);
 DictStruct concatenate(vector<DictStruct>const &list);
 /*
  * Anagram, retourne les anagramme possible en fonction du dico et des
@@ -107,20 +115,20 @@ void anagram(vector<DictStruct> dict, DictStruct anagrammeStruct);
 unsigned int word2BinVect(string word);
 vector<DictStruct> trimDict(vector<DictStruct> dict, DictStruct anagram);
 
-int lecture(vector<DictStruct> &listOfDictStruct, bool exitIfError)
+int lecture(vector<DictStruct> &dictionnary, bool exitIfError)
 {
     string entree;
     cin >> entree;
-    int status = 0;
+    int status = OK;
     bool firstNotInCapital = true;
     while(entree != "." and entree != "*")
     {
-        DictStruct wordFromDict = computeString(entree);
-        int index = findPos(wordFromDict, listOfDictStruct);
-        status = test(wordFromDict, index, listOfDictStruct);
-        if(status == 0)
+        DictStruct wordCandidate = computeString(entree);
+        int index = findPos(wordCandidate, dictionnary);
+        status = test(wordCandidate, index, dictionnary);
+        if(status == OK)
         {
-            insert(index, wordFromDict, listOfDictStruct);
+            insert(index, wordCandidate, dictionnary);
         }
         else
         {
@@ -128,7 +136,7 @@ int lecture(vector<DictStruct> &listOfDictStruct, bool exitIfError)
         }
         cin >> entree;
     }
-    if((listOfDictStruct.size() == 0) and exitIfError)
+    if((dictionnary.size() == 0) and exitIfError)
     {
         cout << EMPTY_DICO << endl;
         exit(0);
@@ -139,14 +147,14 @@ int lecture(vector<DictStruct> &listOfDictStruct, bool exitIfError)
     }
     if(entree == ".")
     {
-        return 3;
+        return ENDOFENTRY;
     }
     return status;
 }
 
 void manageException(int status, bool exitIfError, bool &firstNotInCapital)
 {
-    if(status == 1)
+    if(status == CAPITALIZATIONERROR)
     {
         if(firstNotInCapital and not exitIfError)
         {
@@ -159,7 +167,7 @@ void manageException(int status, bool exitIfError, bool &firstNotInCapital)
             exit(0); // quit if not fully in caps and reading dict
         }
     }
-    else if((status == 2) and exitIfError)
+    else if((status == REDUNDANTERROR) and exitIfError)
     {
         cout << DOUBLE_WORD << endl;
         exit(0); // quit if aldready in dict (dont apply for anagra)
@@ -186,28 +194,28 @@ void displayDebug(vector<DictStruct> &dictionnary)
     }
 }
 
-int test(DictStruct structStringEntree, int index,
-            vector<DictStruct> &listOfDictStruct)
+int test(DictStruct structStringToTest, int index,
+            vector<DictStruct> &dictionnary)
 {
-    if(not isCaps(structStringEntree.mot))
+    if(not isCaps(structStringToTest.mot))
     {
-        return 1;
+        return CAPITALIZATIONERROR;
     }
-    else if(inDict(structStringEntree, index, listOfDictStruct))
+    else if(inDict(structStringToTest, index, dictionnary))
     {
-        return 2;
+        return REDUNDANTERROR;
     }
     else
     {
-        return 0;
+        return OK;
     }
 }
 
-bool isCaps(string stringEntree)
+bool isCaps(string structStringToTest)
 {
-    for(unsigned int charIndex = 0; charIndex<stringEntree.length(); charIndex++)
+    for(unsigned int charIndex = 0; charIndex<structStringToTest.length(); charIndex++)
     {
-        if(stringEntree.at(charIndex)<65 or stringEntree.at(charIndex)>90)
+        if(structStringToTest.at(charIndex)<65 or structStringToTest.at(charIndex)>90)
         {
             return false;
         }
@@ -215,35 +223,35 @@ bool isCaps(string stringEntree)
     return true;
 }
 
-bool inDict(DictStruct structStringEntree, int index,
-            vector<DictStruct> &listOfDictStruct)
+bool inDict(DictStruct structStringToTest, int index,
+            vector<DictStruct> &dictionnary)
 {
     if(index == 0)
     {
         return false;
     }
-    if(listOfDictStruct[index].mot == structStringEntree.mot)
+    if(dictionnary[index].mot == structStringToTest.mot)
     { // check si la string est la meme -> dans le dico
         return true;
     } // sinon c'est l'adresse a l'aquelle il devra etre rangé
     return false;
 }
 
-int findPos(DictStruct structStringEntree, vector<DictStruct> &listOfDictStruct)
+int findPos(DictStruct structStringToTest, vector<DictStruct> &dictionnary)
 {
     unsigned int i = 0;
     bool wordDontMatch = true;
     while(wordDontMatch)
     {
-        if(i >= listOfDictStruct.size())
+        if(i >= dictionnary.size())
         {
             return (i); // prevent segfault
         }
-        int resultCompairaison = compare(listOfDictStruct[i], structStringEntree);
+        int resultCompairaison = compare(dictionnary[i], structStringToTest);
         if (resultCompairaison == 0)
         {
-            string word = listOfDictStruct[i].mot;
-            if(structStringEntree.mot > word)
+            string word = dictionnary[i].mot;
+            if(structStringToTest.mot > word)
             {
                 ++i;
             }
@@ -289,25 +297,23 @@ int findPosAlphabet(string stringEntree, vector<string> &listOfString)
     return positionInIndex;
 }
 
-void insert(int index, DictStruct structToInsert,vector<DictStruct> &listOfDictStruct)
+void insert(int index, DictStruct structToInsert,vector<DictStruct> &dictionnary)
 {
-    vector<DictStruct> tempListOfDictStruct;
-    DictStruct tempA = structToInsert;
+    DictStruct swapA = structToInsert;
     unsigned int idx(index);
     // attention <= car taille apres ajout = taille + 1
-    if(idx < listOfDictStruct.size())
+    if(idx < dictionnary.size())
     {
-        tempA = listOfDictStruct[idx];
-        listOfDictStruct[idx] = structToInsert;
-        for(unsigned int i = idx+1; i<listOfDictStruct.size(); ++i)
+        swapA = dictionnary[idx];
+        dictionnary[idx] = structToInsert;
+        for(unsigned int i = idx+1; i<dictionnary.size(); ++i)
         {
-            DictStruct tempB = listOfDictStruct[i];
-            listOfDictStruct[i] = tempA;
-            tempA = tempB;
+            DictStruct swapB = dictionnary[i];
+            dictionnary[i] = swapA;
+            swapA = swapB;
         }
     }
-    listOfDictStruct.push_back(tempA);
-    return;
+    dictionnary.push_back(swapA);
 }
 
 void insert(int index, string stringToInsert, vector<string> &listOfString)
@@ -382,23 +388,6 @@ DictStruct computeString(string word)
     return dictEntry;
 }
 
-DictStruct computeString(vector <string> multiword)
-{
-    DictStruct dictEntry;
-    dictEntry.IsComposed = true;
-    dictEntry.subwords = multiword;
-    string word;
-    for(unsigned int i = 0;i < multiword.size(); ++i)
-    {
-        word = word + multiword[i];
-    }
-    dictEntry.mot = word;
-    dictEntry.nbT = word.length();
-    dictEntry.sortedStringOnChar = sort(word);
-    dictEntry.nbD = computeNbD(dictEntry.sortedStringOnChar);
-    return dictEntry;
-}
-
 DictStruct computeStringFast(vector <string> multiword)
 {
     DictStruct dictEntry;
@@ -438,12 +427,12 @@ void computeMultiverseFromDict(vector<DictStruct> &dico,
     for(unsigned i = 0; i<dico.size(); ++i)
     {// extract each word from the dictionnary
         multiverseSeed.push_back(dico[i].mot);
-    }
+    }// compute all combiniation of thoses words 2^n
     vector<vector<string>> multiverse = combination(multiverseSeed, anagram.nbT);
     anaSpace = dico;
     anaSpace.reserve(pow(2, multiverseSeed.size()));
     for(unsigned i = 0; i<multiverse.size(); ++i)
-    {
+    { // compute each combination and add it to the anagramme space of possibility
         DictStruct wordFromDict = computeStringFast(multiverse[i]);
         anaSpace.push_back(wordFromDict);
     }
@@ -522,12 +511,12 @@ int factorial(int n)
     return factorial(n-1)*n;
 }
 
-void permutation(vector<string> &listOfString, vector<vector<string>> &permut, int z)
+void permutation(vector<string> &listOfString, vector<vector<string>> &permutList, int z)
 {
     if(listOfString.size() == 2)
     {
-        permut.push_back({listOfString[1],listOfString[0]});
-        permut.push_back({listOfString[0],listOfString[1]});
+        permutList.push_back({listOfString[1],listOfString[0]});
+        permutList.push_back({listOfString[0],listOfString[1]});
     }
     else if(listOfString.size() > 2)
     {
@@ -540,10 +529,10 @@ void permutation(vector<string> &listOfString, vector<vector<string>> &permut, i
             }
             sublist.pop_back();
             unsigned int factoria = factorial(sublist.size());
-            permutation(sublist, permut, z+i*factoria);
+            permutation(sublist, permutList, z+i*factoria);
             for(unsigned int j = 0; j<factoria; ++j)
             {
-                permut[j+i*factoria+z].push_back(listOfString[i]);
+                permutList[j+i*factoria+z].push_back(listOfString[i]);
             }
         }
     }
@@ -553,37 +542,37 @@ int compare(DictStruct structA, DictStruct structB)
 {
         if(structA.nbT > structB.nbT)
         {
-            return 1;
+            return GREATER;
         }
         else if(structA.nbT == structB.nbT)
         {
             if(structA.nbD > structB.nbD)
             {
-                return 1;
+                return GREATER;
             }
             else if (structA.nbD == structB.nbD)
             {
                 if(structA.sortedStringOnChar > structB.sortedStringOnChar)
                 {
-                    return 1;
+                    return GREATER;
                 }
                 else if(structA.sortedStringOnChar == structB.sortedStringOnChar)
                 {
-                    return 0;
+                    return EQUAL;
                 }
                 else
                 {
-                    return -1;
+                    return LOWER;
                 }
             }
             else
             {
-                return -1;
+                return LOWER;
             }
         }
         else
         {
-            return -1;
+            return LOWER;
         }
 }
 
@@ -591,18 +580,18 @@ int compareFast(DictStruct structA, DictStruct structB)
 {
     if(structA.sortedStringOnChar == structB.sortedStringOnChar)
     {
-        return 0;
+        return EQUAL;
     }
-    return 1;
+    return GREATER;
 }
 
-vector<int> findAm(DictStruct structStringEntree, vector<DictStruct> &listOfDictStruct)
+vector<int> findAm(DictStruct anagram, vector<DictStruct> &dictionnary)
 {
     vector<int> positionInIndex = {};
-    for(unsigned int i = 0; i<listOfDictStruct.size();++i)
+    for(unsigned int i = 0; i<dictionnary.size();++i)
     {
-        int result = compareFast(structStringEntree,listOfDictStruct[i]);
-        if(result == 0)
+        int result = compareFast(anagram,dictionnary[i]);
+        if(result == OK)
         {
             positionInIndex.push_back(i);
         }
@@ -612,12 +601,12 @@ vector<int> findAm(DictStruct structStringEntree, vector<DictStruct> &listOfDict
 
 DictStruct concatenate(vector<DictStruct>const &list)
 {
-    string anagrammeInputConcat;
+    string concatenated;
     for(unsigned int i = 0; i<list.size(); ++i)
     {
-        anagrammeInputConcat = anagrammeInputConcat + list[i].mot;
+        concatenated = concatenated + list[i].mot;
     }
-    return computeString(anagrammeInputConcat);
+    return computeString(concatenated);
 }
 
 void anagram(vector<DictStruct> dict, DictStruct anagrammeStruct)
@@ -647,7 +636,7 @@ void anagram(vector<DictStruct> dict, DictStruct anagrammeStruct)
     }
     if(index.size() == 0)
     {
-        cout << NO_ANAGRAM<< endl;
+        cout << NO_ANAGRAM << endl;
     }
 }
 
@@ -699,7 +688,7 @@ int main()
         anagramme = concatenate(anagrammeSentence);
         vector<DictStruct> trimmedDict = trimDict(dictionnary, anagramme);
         computeMultiverseFromDict(trimmedDict, anaSpace, anagramme);
-        if(status == 3)
+        if(status == ENDOFENTRY)
         {
             if(anagramme.nbT != 0)
             {
@@ -710,4 +699,3 @@ int main()
     }
     return 0;
 }
-// TODO : check P5 check P63  check E16
